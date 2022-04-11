@@ -1,0 +1,12 @@
+{
+  "additionalFiles": "",
+  "builtInLibrariesFolders": "A:\\Program Files (x86)\\Arduino\\libraries",
+  "builtInToolsFolders": "A:\\Program Files (x86)\\Arduino\\tools-builder,A:\\Program Files (x86)\\Arduino\\hardware\\tools\\avr,A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages",
+  "compiler.optimization_flags": "-Os",
+  "customBuildProperties": "build.path=a:\\Users\\robed\\OneDrive - Universidad del Norte\\U\\#9\\Proyecto Final\\Code\\test\\build,build.warn_data_percentage=75,runtime.tools.arm-none-eabi-gcc.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\arm-none-eabi-gcc\\7-2017q4,runtime.tools.arm-none-eabi-gcc-7-2017q4.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\arm-none-eabi-gcc\\7-2017q4,runtime.tools.openocd.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\openocd\\0.10.0-arduino7,runtime.tools.openocd-0.10.0-arduino7.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\openocd\\0.10.0-arduino7,runtime.tools.bossac.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\bossac\\1.7.0-arduino3,runtime.tools.bossac-1.7.0-arduino3.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\bossac\\1.7.0-arduino3,runtime.tools.CMSIS.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\CMSIS\\4.5.0,runtime.tools.CMSIS-4.5.0.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\CMSIS\\4.5.0,runtime.tools.CMSIS-Atmel.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\CMSIS-Atmel\\1.2.0,runtime.tools.CMSIS-Atmel-1.2.0.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\CMSIS-Atmel\\1.2.0,runtime.tools.arduinoOTA.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\arduinoOTA\\1.2.1,runtime.tools.arduinoOTA-1.2.1.path=A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\arduinoOTA\\1.2.1",
+  "fqbn": "arduino:samd:arduino_zero_native",
+  "hardwareFolders": "A:\\Program Files (x86)\\Arduino\\hardware,A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages",
+  "otherLibrariesFolders": "A:\\Users\\robed\\Documents\\Arduino\\libraries",
+  "runtime.ide.version": "10819",
+  "sketchLocation": "a:\\Users\\robed\\OneDrive - Universidad del Norte\\U\\#9\\Proyecto Final\\Code\\test\\sketch\\sketch.ino"
+}

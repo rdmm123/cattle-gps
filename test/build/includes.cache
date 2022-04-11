@@ -1,0 +1,27 @@
+[
+  {
+    "Sourcefile": null,
+    "Include": "",
+    "Includepath": "A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\samd\\1.8.13\\cores\\arduino"
+  },
+  {
+    "Sourcefile": null,
+    "Include": "",
+    "Includepath": "A:\\Users\\robed\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\samd\\1.8.13\\variants\\arduino_zero"
+  },
+  {
+    "Sourcefile": "a:\\Users\\robed\\OneDrive - Universidad del Norte\\U\\#9\\Proyecto Final\\Code\\test\\build\\sketch\\sketch.ino.cpp",
+    "Include": "TinyGPSPlus.h",
+    "Includepath": "A:\\Users\\robed\\Documents\\Arduino\\libraries\\TinyGPSPlus\\src"
+  },
+  {
+    "Sourcefile": "a:\\Users\\robed\\OneDrive - Universidad del Norte\\U\\#9\\Proyecto Final\\Code\\test\\build\\sketch\\sketch.ino.cpp",
+    "Include": "",
+    "Includepath": null
+  },
+  {
+    "Sourcefile": "A:\\Users\\robed\\Documents\\Arduino\\libraries\\TinyGPSPlus\\src\\TinyGPS++.cpp",
+    "Include": "",
+    "Includepath": null
+  }
+]

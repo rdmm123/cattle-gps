@@ -1,0 +1,5 @@
+{
+    "sketch": "cattlegps.ino",
+    "board": "arduino:samd:arduino_zero_native",
+    "port": "COM7"
+}

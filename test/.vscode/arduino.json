@@ -1,0 +1,6 @@
+{
+    "sketch": "sketch\\sketch.ino",
+    "output": "build",
+    "board": "arduino:samd:arduino_zero_native",
+    "port": "COM7"
+}
