@@ -132,32 +132,34 @@ void do_send(osjob_t* j){
         static uint8_t depto = 33;
         
         payload[0] = depto;
-        
-        byte fincaLow =  lowByte(finca);
-        payload[1] = fincaLow;
 
         byte fincaHigh =  highByte(finca);
-        payload[2] = fincaHigh;
+        payload[1] = fincaHigh;
+        
+        byte fincaLow =  lowByte(finca);
+        payload[2] = fincaLow;
+
+        byte vacaHigh =  highByte(vaca);
+        payload[3] = vacaHigh;
 
         byte vacaLow =  lowByte(vaca);
-        payload[3] = vacaLow;
+        payload[4] = vacaLow;
 
-        byte vacaHigh =  highByte(finca);
-        payload[4] = vacaHigh;
-
-        latitude = latitude / 90; // Se normaliza para que tenga rango de -1 a 1
-        uint16_t payloadLatitude = LMIC_f2sflt16(latitude);
+        float normLatitude = latitude / 90; // Se normaliza para que tenga rango de -1 a 1
+        uint16_t payloadLatitude = LMIC_f2sflt16(normLatitude);
         byte latLow = lowByte(payloadLatitude);
         byte latHigh = highByte(payloadLatitude);
-        payload[5] = latLow;
-        payload[6] = latHigh;
-
-        longitude = longitude / 180; // Se normaliza para que tenga rango de -1 a 1
-        uint16_t payloadLongitude = LMIC_f2sflt16(longitude);
+        payload[5] = latHigh;
+        payload[6] = latLow;
+        
+        float normLongitude = longitude / 180; // Se normaliza para que tenga rango de -1 a 1
+        uint16_t payloadLongitude = LMIC_f2sflt16(normLongitude);
+        SerialUSB.print("Longitud: ");
+        SerialUSB.println(longitude);
         byte lngLow = lowByte(payloadLongitude);
         byte lngHigh = highByte(payloadLongitude);
-        payload[7] = lngLow;
-        payload[8] = lngHigh;
+        payload[7] = lngHigh;
+        payload[8] = lngLow;
         
         LMIC_setTxData2(1, payload, sizeof(payload)-1, 0);
         SerialUSB.println(F("Packet queued"));
@@ -217,14 +219,14 @@ void setup() {
 }
 
 void loop() {
-    unsigned long now;
-    now = millis();
-    if ((now & 512) != 0) {
-      digitalWrite(13, HIGH);
-    }
-    else {
-      digitalWrite(13, LOW);
-    }
+//    unsigned long now;
+//    now = millis();
+//    if ((now & 512) != 0) {
+//      digitalWrite(13, HIGH);
+//    }
+//    else {
+//      digitalWrite(13, LOW);
+//    }
 
     os_runloop_once();
 
