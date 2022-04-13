@@ -2,30 +2,20 @@
 #include <hal/hal.h>
 #include <SPI.h>
 
-// LoRaWAN NwkSKey, network session key
-// This should be in big-endian (aka msb).
-//static const PROGMEM u1_t NWKSKEY[16] = { 0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6, 0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C };
- static const PROGMEM u1_t NWKSKEY[16] = { 0xA1, 0x16, 0xA7, 0x51, 0x3D, 0xD4, 0x63, 0x56, 0xAD, 0x96, 0x61, 0xCD, 0xBF, 0x31, 0x52, 0x4A };
+static const u1_t PROGMEM APPEUI[8]={ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
 
-// LoRaWAN AppSKey, application session key
-// This should also be in big-endian (aka msb).
- static const u1_t PROGMEM APPSKEY[16] = { 0x7F, 0xF4, 0x75, 0x8A, 0x2D, 0xF1, 0x38, 0x2A, 0x87, 0xDA, 0x6C, 0x43, 0xC3, 0x10, 0x33, 0x73 };
-//static const u1_t PROGMEM APPSKEY[16] = { 0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6, 0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C };
+// This should also be in little endian format, see above.
+static const u1_t PROGMEM DEVEUI[8]={ 0x70, 0xF3, 0x04, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
+void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 
-// LoRaWAN end-device address (DevAddr)
-// See http://thethingsnetwork.org/wiki/AddressSpace
-// The library converts the address to network byte order as needed, so this should be in big-endian (aka msb) too.
-static const u4_t DEVADDR = 0x260CA563 ; // <-- Change this address for every node!
+// This key should be in big endian format (or, since it is not really a
+// number but a block of memory, endianness does not really apply). In
+// practice, a key taken from ttnctl can be copied as-is.
+static const u1_t PROGMEM APPKEY[16] = { 0xDF, 0x0A, 0x41, 0xEC, 0xA6, 0xFA, 0x06, 0xE2, 0x11, 0xDD, 0xDC, 0xE1, 0x18, 0xCA, 0x8E, 0x8F };
+void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
 
-// These callbacks are only used in over-the-air activation, so they are
-// left empty here (we cannot leave them out completely unless
-// DISABLE_JOIN is set in arduino-lmic/project_config/lmic_project_config.h,
-// otherwise the linker will complain).
-void os_getArtEui (u1_t* buf) { }
-void os_getDevEui (u1_t* buf) { }
-void os_getDevKey (u1_t* buf) { }
-
-static uint8_t payload[9];
+static uint8_t payload[10];
 static osjob_t sendjob;
 
 // Schedule TX every this many seconds (might become longer due to duty
@@ -41,6 +31,13 @@ const lmic_pinmap lmic_pins = {
                                     // DIO1 is on JP1-1: is io1 - we connect to GPO6
                                     // DIO1 is on JP5-3: is D2 - we connect to GPO5
 };
+
+void printHex2(unsigned v) {
+    v &= 0xff;
+    if (v < 16)
+        Serial.print('0');
+    Serial.print(v, HEX);
+}
 
 void onEvent (ev_t ev) {
     SerialUSB.print(os_getTime());
@@ -62,7 +59,36 @@ void onEvent (ev_t ev) {
             SerialUSB.println(F("EV_JOINING"));
             break;
         case EV_JOINED:
-            SerialUSB.println(F("EV_JOINED"));
+            Serial.println(F("EV_JOINED"));
+            {
+              u4_t netid = 0;
+              devaddr_t devaddr = 0;
+              u1_t nwkKey[16];
+              u1_t artKey[16];
+              LMIC_getSessionKeys(&netid, &devaddr, nwkKey, artKey);
+              SerialUSB.print("netid: ");
+              SerialUSB.println(netid, DEC);
+              SerialUSB.print("devaddr: ");
+              SerialUSB.println(devaddr, HEX);
+              SerialUSB.print("AppSKey: ");
+              for (size_t i=0; i<sizeof(artKey); ++i) {
+                if (i != 0)
+                  SerialUSB.print("-");
+                printHex2(artKey[i]);
+              }
+              SerialUSB.println("");
+              SerialUSB.print("NwkSKey: ");
+              for (size_t i=0; i<sizeof(nwkKey); ++i) {
+                      if (i != 0)
+                              SerialUSB.print("-");
+                      printHex2(nwkKey[i]);
+              }
+              SerialUSB.println();
+            }
+            // Disable link check validation (automatically enabled
+            // during join, but because slow data rates change max TX
+      // size, we don't use it in this example.
+            LMIC_setLinkCheckMode(0);
             break;
         case EV_JOIN_FAILED:
             SerialUSB.println(F("EV_JOIN_FAILED"));
@@ -127,6 +153,7 @@ void do_send(osjob_t* j){
         // Datos de prueba
         static float latitude = 11.005610;
         static float longitude = -74.791695;
+      // static float longitude = 11.005610;
         static uint16_t vaca = 123;
         static uint16_t finca = 456;
         static uint8_t depto = 33;
@@ -145,18 +172,23 @@ void do_send(osjob_t* j){
         byte vacaLow =  lowByte(vaca);
         payload[4] = vacaLow;
 
-        float normLatitude = latitude / 90; // Se normaliza para que tenga rango de -1 a 1
-        uint16_t payloadLatitude = LMIC_f2sflt16(normLatitude);
+        // float normLatitude = latitude / 90; // Se normaliza para que tenga rango de -1 a 1
+//        uint16_t payloadLatitude = LMIC_f2sflt16(normLatitude);
+        int16_t payloadLatitude = (int) (latitude*100);
         byte latLow = lowByte(payloadLatitude);
         byte latHigh = highByte(payloadLatitude);
         payload[5] = latHigh;
         payload[6] = latLow;
         
-        float normLongitude = longitude / 180; // Se normaliza para que tenga rango de -1 a 1
-        uint16_t payloadLongitude = LMIC_f2sflt16(normLongitude);
+        // float normLongitude = longitude / 180; // Se normaliza para que tenga rango de -1 a 1
+//        uint16_t payloadLongitude = LMIC_f2sflt16(normLongitude);
+        int16_t payloadLongitude = (int) longitude*100;
+        SerialUSB.print("Latitud: ");
+        SerialUSB.println(latitude);
+        SerialUSB.println(payloadLatitude);
         SerialUSB.print("Longitud: ");
-        SerialUSB.println(normLongitude);
-        
+        SerialUSB.println(longitude);
+        SerialUSB.println(payloadLongitude);
         byte lngLow = lowByte(payloadLongitude);
         byte lngHigh = highByte(payloadLongitude);
         payload[7] = lngHigh;
@@ -186,26 +218,6 @@ void setup() {
     os_init();
     // Reset the MAC state. Session and pending data transfers will be discarded.
     LMIC_reset();
-
-    // Set static session parameters. Instead of dynamically establishing a session
-    // by joining the network, precomputed session parameters are be provided.
-    #ifdef PROGMEM
-    // On AVR, these values are stored in flash and only copied to RAM
-    // once. Copy them to a temporary buffer here, LMIC_setSession will
-    // copy them into a buffer of its own again.
-    uint8_t appskey[sizeof(APPSKEY)];
-    uint8_t nwkskey[sizeof(NWKSKEY)];
-    memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
-    memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
-    LMIC_setSession (0x13, DEVADDR, nwkskey, appskey);
-    #else
-     If not running an AVR with PROGMEM, just use the arrays directly
-    LMIC_setSession (0x13, DEVADDR, NWKSKEY, APPSKEY);
-    #endif
-
-    // Disable link check validation
-    LMIC_setLinkCheckMode(0);
-
     // TTN uses SF9 for its RX2 window.
     LMIC.dn2Dr = DR_SF9;
 
@@ -214,7 +226,7 @@ void setup() {
     LMIC_setDrTxpow(DR_SF7,14);
 
     LMIC_selectSubBand(1);
-
+  
     // Start job
     do_send(&sendjob);
 }
