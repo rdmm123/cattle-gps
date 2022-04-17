@@ -22,6 +22,8 @@ static osjob_t sendjob;
 // cycle limitations).
 const unsigned TX_INTERVAL = 60;
 
+bool ready_to_send = false;
+
 // Pin mapping
 const lmic_pinmap lmic_pins = {
     .nss = 3,                       // chip select on feather (rf95module) CS
@@ -147,7 +149,7 @@ void do_send(osjob_t* j){
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
         SerialUSB.println(F("OP_TXRXPEND, not sending"));
-    } else {
+    } else if (ready_to_send) {
         // Prepare upstream data transmission at the next possible time.
 
         // Datos de prueba
@@ -174,7 +176,8 @@ void do_send(osjob_t* j){
 
         // float normLatitude = latitude / 90; // Se normaliza para que tenga rango de -1 a 1
 //        uint16_t payloadLatitude = LMIC_f2sflt16(normLatitude);
-        int16_t payloadLatitude = (int) (latitude*100);
+        float approxLatitude = latitude*100;
+        int16_t payloadLatitude = (int) (approxLatitude);
         byte latLow = lowByte(payloadLatitude);
         byte latHigh = highByte(payloadLatitude);
         payload[5] = latHigh;
@@ -182,7 +185,8 @@ void do_send(osjob_t* j){
         
         // float normLongitude = longitude / 180; // Se normaliza para que tenga rango de -1 a 1
 //        uint16_t payloadLongitude = LMIC_f2sflt16(normLongitude);
-        int16_t payloadLongitude = (int) longitude*100;
+        float approxLongitude = longitude*100;
+        int16_t payloadLongitude = (int) approxLongitude;
         SerialUSB.print("Latitud: ");
         SerialUSB.println(latitude);
         SerialUSB.println(payloadLatitude);
@@ -200,9 +204,14 @@ void do_send(osjob_t* j){
     // Next TX is scheduled after TX_COMPLETE event.
 }
 
+void check_if_ready() {
+  if (millis() > 30000) {
+    ready_to_send = true;
+  }
+}
+
 void setup() {
-//    pinMode(13, OUTPUT);
-    while (!SerialUSB); // wait for SerialUSB to be initialized
+//    pinMode(13, OUTPUT); // wait for SerialUSB to be initialized
     SerialUSB.begin(115200);
     delay(100);     // per sample code on RF_95 test
     SerialUSB.println(F("Starting"));
@@ -240,7 +249,7 @@ void loop() {
 //    else {
 //      digitalWrite(13, LOW);
 //    }
-
+    check_if_ready();
     os_runloop_once();
 
 }
