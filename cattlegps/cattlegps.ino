@@ -1,7 +1,7 @@
 #include <lmic.h>
 #include <hal/hal.h>
 #include <SPI.h>
-#include <TinyGPS++.h>
+#include <TinyGPSPlus.h>
 
 static const u1_t PROGMEM APPEUI[8]={ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
@@ -31,6 +31,7 @@ static const uint32_t GPSBaud = 9600;
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
 const unsigned TX_INTERVAL = 60;
+bool joined = false;
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -43,6 +44,7 @@ const lmic_pinmap lmic_pins = {
 };
 
 void setup() {
+  Serial1.begin(GPSBaud);
   // wait for SerialUSB to be initialized
   SerialUSB.begin(115200);
   delay(100);     // per sample code on RF_95 test
@@ -64,53 +66,43 @@ void setup() {
 }
 
 void displayInfo() {
-  Serial.print(F("Location: "));
-  if (gps.location.isValid())
-  {
-    Serial.print(gps.location.lat(), 6);
-    Serial.print(F(","));
-    Serial.print(gps.location.lng(), 6);
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
+  SerialUSB.print("Latitud: ");
+  SerialUSB.println(gps.location.lat()); 
+  SerialUSB.print("Longitud: ");
+  SerialUSB.println(gps.location.lng());
+  SerialUSB.println(gps.location.isValid());
+  SerialUSB.print("Fecha y Hora: ");
+  char sz[32];
+  sprintf(sz, "%02d/%02d/%02d ", gps.date.month(), gps.date.day(), gps.date.year());
+  SerialUSB.print(sz);
+  sprintf(sz, "%02d:%02d:%02d ", gps.time.hour(), gps.time.minute(), gps.time.second());
+  SerialUSB.println(sz);
+  SerialUSB.print("Chars: ");
+  SerialUSB.println(gps.charsProcessed());
+}
 
-  Serial.print(F("  Date/Time: "));
-  if (gps.date.isValid())
+static void smartDelay(unsigned long ms)
+{
+  unsigned long start = millis();
+  do 
   {
-    Serial.print(gps.date.day());
-    Serial.print(F("-"));
-    Serial.print(gps.date.month());
-    Serial.print(F("-"));
-    Serial.print(gps.date.year());
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
+    while (Serial1.available())
+      gps.encode(Serial1.read());
+  } while (millis() - start < ms);
+}
 
-  Serial.print(F(" "));
-  if (gps.time.isValid())
-  {
-    if (gps.time.hour() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.hour());
-    Serial.print(F(":"));
-    if (gps.time.minute() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.minute());
-    Serial.print(F(":"));
-    if (gps.time.second() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.second());
-    Serial.print(F("."));
-    if (gps.time.centisecond() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.centisecond());
+static bool fetchGPS(unsigned long maxTime) {
+  unsigned long start = millis();
+  while (true) {
+    smartDelay(1000);
+    displayInfo();
+    if (gps.location.isValid()) {
+      return true;
+    }
+    if (millis() - start > maxTime) {
+      return false;
+    }
   }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.println();
 }
 
 void get_coords () {
@@ -119,28 +111,18 @@ void get_coords () {
   unsigned short sentences, failed;
   unsigned long age;
 
-  // For one second we parse GPS data and report some key values
-  for (unsigned long start = millis(); millis() - start < 1000;) {
-    while (Serial1.available()) {
-      char c = Serial1.read();
-      SerialUSB.write(c); // uncomment this line if you want to see the GPS data flowing
-      if (gps.encode(c)) { // Did a new valid sentence come in?
-        newData = true;
-      }
+  if (joined) {
+    SerialUSB.println("pinga");
+    bool newData = fetchGPS(60000);
+    if (newData && (gps.location.age()<1000)) {
+      build_packet();
+    } else {
+      SerialUSB.println("pipi");
     }
-  }
-
-  if (newData && (gps.location.age()<1000)) {
+  } else {
+    SerialUSB.println("pene");
     build_packet();
   }
-  displayInfo();
-
-  gps.stats(&chars, &sentences, &failed);
-
-  int32_t lat = 
-  int32_t lng = longitude * 10000;
-
-  // Pad 2 int32_t to 6 8uint_t, big endian (24 bit each, having 11 meter precision)
 }
 
 void build_packet() {
@@ -235,6 +217,7 @@ void onEvent (ev_t ev) {
                       printHex2(nwkKey[i]);
               }
               SerialUSB.println();
+              joined = true;
             }
             // Disable link check validation (automatically enabled
             // during join, but because slow data rates change max TX
