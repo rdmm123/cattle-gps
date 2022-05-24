@@ -2,6 +2,8 @@
 #include <hal/hal.h>
 #include <SPI.h>
 #include <TinyGPSPlus.h>
+#include <ArduinoLowPower.h>
+#include <RTCZero.h>
 
 // LoRaWAN NwkSKey, network session key
 // This should be in big-endian (aka msb).
@@ -38,9 +40,14 @@ TinyGPSPlus gps;
 static const int RXPin = 0, TXPin = 1; 
 static const uint32_t GPSBaud = 9600;
 
+#define PMTK_SET_STANDBY_MODE "$PMTK161,0*28"
+#define PMTK_SET_FULLON_MODE "$PMTK353,1,1,0,0,0*2B"
+#define PMTK_SET_ALWAYS_LOCATE_MODE "$PMTK225,8*23"
+
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
 const unsigned TX_INTERVAL = 60;
+const int TX_INTERVAL_MS = TX_INTERVAL*1000;
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -52,11 +59,16 @@ const lmic_pinmap lmic_pins = {
                                     // DIO1 is on JP5-3: is D2 - we connect to GPO5
 };
 
+RTCZero rtc;
+
 void setup() {
   Serial1.begin(GPSBaud);
+  Serial1.println(F(PMTK_SET_FULLON_MODE));
+  pinMode(STANDBY_PIN, OUTPUT);
+  digitalWrite(STANDBY_PIN, HIGH);
   // wait for SerialUSB to be initialized
   SerialUSB.begin(115200);
-  delay(100);     // per sample code on RF_95 test
+  delay(1000);     // per sample code on RF_95 test
   SerialUSB.println(F("Starting"));
   // LMIC init
   os_init();
@@ -86,7 +98,7 @@ void setup() {
   LMIC_setDrTxpow(DR_SF7,14);
 
   LMIC_selectSubBand(1);
-
+  
   // Start job
   do_send(&sendjob);
 }
@@ -137,8 +149,13 @@ void get_coords () {
   unsigned long age;
 
   SerialUSB.println("pinga");
-  bool newData = fetchGPS(60000);
+  Serial1.println(F(PMTK_SET_FULLON_MODE));
+  SerialUSB.println(F(PMTK_SET_FULLON_MODE));
+  delay(1000);
+  bool newData = fetchGPS(30000);
   build_packet();
+  Serial1.println(F(PMTK_SET_STANDBY_MODE));
+  SerialUSB.println(F(PMTK_SET_STANDBY_MODE));
 }
 
 void build_packet() {
@@ -173,8 +190,9 @@ void do_send(osjob_t* j){
       SerialUSB.println(F("OP_TXRXPEND, not sending"));
   } else {
       // Prepare upstream data transmission at the next possible time.
-
+      
       get_coords();
+      
       LMIC_setTxData2(1, payload, sizeof(payload)-1, 0);
       SerialUSB.println(F("Packet queued"));
   }
@@ -255,7 +273,14 @@ void onEvent (ev_t ev) {
               SerialUSB.println(F(" bytes of payload"));
             }
             // Schedule next transmission
-            os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
+            Serial.flush();
+            LowPower.sleep(TX_INTERVAL_MS);
+            // Sleep for a period of TX_INTERVAL using single shot alarm
+//            rtc.setAlarmEpoch(rtc.getEpoch() + TX_INTERVAL);
+//            rtc.enableAlarm(rtc.MATCH_YYMMDDHHMMSS);
+//            rtc.attachInterrupt(alarmMatch);
+//            rtc.standbyMode();
+            os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(1), do_send);
             break;
         case EV_LOST_TSYNC:
             SerialUSB.println(F("EV_LOST_TSYNC"));
@@ -294,4 +319,9 @@ void onEvent (ev_t ev) {
 
 void loop() {
     os_runloop_once();
+}
+
+void alarmMatch()
+{
+
 }

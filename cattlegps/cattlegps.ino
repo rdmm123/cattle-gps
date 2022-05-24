@@ -2,6 +2,8 @@
 #include <hal/hal.h>
 #include <SPI.h>
 #include <TinyGPSPlus.h>
+#include <RTCZero.h>
+#include <ArduinoLowPower.h>
 
 static const u1_t PROGMEM APPEUI[8]={ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
@@ -31,7 +33,9 @@ static const uint32_t GPSBaud = 9600;
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
 const unsigned TX_INTERVAL = 60;
+const int TX_INTERVAL_MS = TX_INTERVAL*1000;
 bool joined = false;
+const int STANDBY_PIN = 13;
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -43,12 +47,21 @@ const lmic_pinmap lmic_pins = {
                                     // DIO1 is on JP5-3: is D2 - we connect to GPO5
 };
 
+RTCZero rtc;
+
 void setup() {
+  pinMode(STANDBY_PIN, OUTPUT);
   Serial1.begin(GPSBaud);
   // wait for SerialUSB to be initialized
   SerialUSB.begin(115200);
   delay(100);     // per sample code on RF_95 test
   SerialUSB.println(F("Starting"));
+
+  // Initialize RTC
+  rtc.begin();
+  // Use RTC as a second timer instead of calendar
+  rtc.setEpoch(0);
+  
   // LMIC init
   os_init();
   // Reset the MAC state. Session and pending data transfers will be discarded.
@@ -57,7 +70,7 @@ void setup() {
   LMIC.dn2Dr = DR_SF9;
 
   // Set data rate and transmit power for uplink
-  LMIC_setDrTxpow(DR_SF7,14);
+  LMIC_setDrTxpow(DR_SF12,14);
 
   LMIC_selectSubBand(1);
 
@@ -99,7 +112,7 @@ static bool fetchGPS(unsigned long maxTime) {
     if (gps.location.isValid()) {
       return true;
     }
-    if (millis() - start > maxTime) {
+    if (millis() - start   > maxTime) {
       return false;
     }
   }
@@ -113,7 +126,9 @@ void get_coords () {
 
   if (joined) {
     SerialUSB.println("pinga");
-    bool newData = fetchGPS(60000);
+    digitalWrite(STANDBY_PIN, HIGH);
+    delay(1000);
+    bool newData = fetchGPS(10000);
     if (newData && (gps.location.age()<1000)) {
       build_packet();
     } else {
@@ -123,6 +138,7 @@ void get_coords () {
     SerialUSB.println("pene");
     build_packet();
   }
+  digitalWrite(STANDBY_PIN, LOW);
 }
 
 void build_packet() {
@@ -239,8 +255,9 @@ void onEvent (ev_t ev) {
               SerialUSB.println(LMIC.dataLen);
               SerialUSB.println(F(" bytes of payload"));
             }
+            LowPower.sleep(TX_INTERVAL_MS); 
             // Schedule next transmission
-            os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
+            os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(1), do_send);
             break;
         case EV_LOST_TSYNC:
             SerialUSB.println(F("EV_LOST_TSYNC"));
