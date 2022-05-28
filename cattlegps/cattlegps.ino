@@ -2,8 +2,8 @@
 #include <hal/hal.h>
 #include <SPI.h>
 #include <TinyGPSPlus.h>
-#include <RTCZero.h>
 #include <ArduinoLowPower.h>
+#include <SerialFlash.h>
 
 static const u1_t PROGMEM APPEUI[8]={ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
@@ -26,16 +26,20 @@ static uint16_t finca = 456;
 static uint8_t depto = 33;
 uint32_t payloadLat, payloadLng;
 
+int joinCount = 0;
+
 TinyGPSPlus gps;
 static const int RXPin = 0, TXPin = 1; 
 static const uint32_t GPSBaud = 9600;
 
+#define PMTK_SET_STANDBY_MODE "$PMTK161,0*28"
+#define PMTK_SET_FULLON_MODE "$PMTK353,1,1,0,0,0*2B"
+
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 60;
+const unsigned TX_INTERVAL = 3600;
 const int TX_INTERVAL_MS = TX_INTERVAL*1000;
 bool joined = false;
-const int STANDBY_PIN = 13;
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -47,21 +51,30 @@ const lmic_pinmap lmic_pins = {
                                     // DIO1 is on JP5-3: is D2 - we connect to GPO5
 };
 
-RTCZero rtc;
+void setPullUpPins() {
+  pinMode(A0, INPUT_PULLUP);
+  pinMode(A1, INPUT_PULLUP);
+  pinMode(A2, INPUT_PULLUP);
+  pinMode(A3, INPUT_PULLUP);
+  pinMode(A4, INPUT_PULLUP);
+  pinMode(A5, INPUT_PULLUP);
+
+  unsigned char pinNumber;
+  for (pinNumber = 4; pinNumber <= 9; pinNumber++){
+    pinMode(pinNumber, INPUT_PULLUP);
+  }
+
+  pinMode(12, INPUT_PULLUP);
+  pinMode(20, INPUT_PULLUP);
+  pinMode(21, INPUT_PULLUP);
+}
 
 void setup() {
-  pinMode(STANDBY_PIN, OUTPUT);
   Serial1.begin(GPSBaud);
   // wait for SerialUSB to be initialized
   SerialUSB.begin(115200);
   delay(100);     // per sample code on RF_95 test
   SerialUSB.println(F("Starting"));
-
-  // Initialize RTC
-  rtc.begin();
-  // Use RTC as a second timer instead of calendar
-  rtc.setEpoch(0);
-  
   // LMIC init
   os_init();
   // Reset the MAC state. Session and pending data transfers will be discarded.
@@ -74,6 +87,16 @@ void setup() {
 
   LMIC_selectSubBand(1);
 
+  // Ahorro de energía
+  SerialFlash.begin(4);
+  SerialFlash.sleep();
+  setPullUpPins();
+  pinMode(25, OUTPUT);
+  pinMode(25, LOW);
+  pinMode(26, OUTPUT);
+  pinMode(26, LOW);
+  // USBDevice.detach();
+  
   // Start job
   do_send(&sendjob);
 }
@@ -125,20 +148,21 @@ void get_coords () {
   unsigned long age;
 
   if (joined) {
-    SerialUSB.println("pinga");
-    digitalWrite(STANDBY_PIN, HIGH);
+    SerialUSB.println("Recopilando información GPS.");
+    Serial1.println(F(PMTK_SET_FULLON_MODE));
+    SerialUSB.println(F(PMTK_SET_FULLON_MODE));
     delay(1000);
     bool newData = fetchGPS(10000);
     if (newData && (gps.location.age()<1000)) {
       build_packet();
     } else {
-      SerialUSB.println("pipi");
+      SerialUSB.println("No se pudo calcular la posición en el tiempo límite.");
     }
   } else {
-    SerialUSB.println("pene");
     build_packet();
   }
-  digitalWrite(STANDBY_PIN, LOW);
+  Serial1.println(F(PMTK_SET_STANDBY_MODE));
+  SerialUSB.println(F(PMTK_SET_STANDBY_MODE));
 }
 
 void build_packet() {
@@ -255,7 +279,9 @@ void onEvent (ev_t ev) {
               SerialUSB.println(LMIC.dataLen);
               SerialUSB.println(F(" bytes of payload"));
             }
-            LowPower.sleep(TX_INTERVAL_MS); 
+            USBDevice.detach();
+            LowPower.sleep(TX_INTERVAL_MS);
+            USBDevice.attach();
             // Schedule next transmission
             os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(1), do_send);
             break;
@@ -286,6 +312,14 @@ void onEvent (ev_t ev) {
             break;
         case EV_JOIN_TXCOMPLETE:
             SerialUSB.println(F("EV_JOIN_TXCOMPLETE: no JoinAccept"));
+            joinCount++;
+            if (joinCount > 5) {
+              SerialUSB.println(F("Join Request fallido en muchas ocasiones. Se inicia sueño profundo por 2h."));
+              USBDevice.detach();
+              LowPower.deepSleep(7200000);
+              USBDevice.attach();
+              joinCount = 0;
+            }
             break;
         default:
             SerialUSB.print(F("Unknown event: "));

@@ -3,7 +3,7 @@
 #include <SPI.h>
 #include <TinyGPSPlus.h>
 #include <ArduinoLowPower.h>
-#include <RTCZero.h>
+#include <SerialFlash.h>
 
 // LoRaWAN NwkSKey, network session key
 // This should be in big-endian (aka msb).
@@ -46,7 +46,7 @@ static const uint32_t GPSBaud = 9600;
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 60;
+const unsigned TX_INTERVAL = 3600;
 const int TX_INTERVAL_MS = TX_INTERVAL*1000;
 
 // Pin mapping
@@ -59,13 +59,27 @@ const lmic_pinmap lmic_pins = {
                                     // DIO1 is on JP5-3: is D2 - we connect to GPO5
 };
 
-RTCZero rtc;
+void setPullUpPins() {
+  pinMode(A0, INPUT_PULLUP);
+  pinMode(A1, INPUT_PULLUP);
+  pinMode(A2, INPUT_PULLUP);
+  pinMode(A3, INPUT_PULLUP);
+  pinMode(A4, INPUT_PULLUP);
+  pinMode(A5, INPUT_PULLUP);
+
+  unsigned char pinNumber;
+  for (pinNumber = 4; pinNumber <= 9; pinNumber++){
+    pinMode(pinNumber, INPUT_PULLUP);
+  }
+
+  pinMode(12, INPUT_PULLUP);
+  pinMode(20, INPUT_PULLUP);
+  pinMode(21, INPUT_PULLUP);
+}
 
 void setup() {
   Serial1.begin(GPSBaud);
   Serial1.println(F(PMTK_SET_FULLON_MODE));
-  pinMode(STANDBY_PIN, OUTPUT);
-  digitalWrite(STANDBY_PIN, HIGH);
   // wait for SerialUSB to be initialized
   SerialUSB.begin(115200);
   delay(1000);     // per sample code on RF_95 test
@@ -98,6 +112,14 @@ void setup() {
   LMIC_setDrTxpow(DR_SF7,14);
 
   LMIC_selectSubBand(1);
+
+  // Ahorro de energía
+  SerialFlash.begin(4);
+  SerialFlash.sleep();
+  setPullUpPins();
+  pinMode(25, OUTPUT);
+  pinMode(25, LOW);
+  pinMode(26, OUTPUT);
   
   // Start job
   do_send(&sendjob);
@@ -152,7 +174,7 @@ void get_coords () {
   Serial1.println(F(PMTK_SET_FULLON_MODE));
   SerialUSB.println(F(PMTK_SET_FULLON_MODE));
   delay(1000);
-  bool newData = fetchGPS(30000);
+  bool newData = fetchGPS(10000);
   build_packet();
   Serial1.println(F(PMTK_SET_STANDBY_MODE));
   SerialUSB.println(F(PMTK_SET_STANDBY_MODE));
@@ -273,13 +295,9 @@ void onEvent (ev_t ev) {
               SerialUSB.println(F(" bytes of payload"));
             }
             // Schedule next transmission
-            Serial.flush();
+            USBDevice.detach();
             LowPower.sleep(TX_INTERVAL_MS);
-            // Sleep for a period of TX_INTERVAL using single shot alarm
-//            rtc.setAlarmEpoch(rtc.getEpoch() + TX_INTERVAL);
-//            rtc.enableAlarm(rtc.MATCH_YYMMDDHHMMSS);
-//            rtc.attachInterrupt(alarmMatch);
-//            rtc.standbyMode();
+            USBDevice.attach();
             os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(1), do_send);
             break;
         case EV_LOST_TSYNC:
