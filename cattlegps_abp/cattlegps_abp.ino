@@ -46,7 +46,7 @@ static const uint32_t GPSBaud = 9600;
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 3600;
+const unsigned TX_INTERVAL = 5400;
 const int TX_INTERVAL_MS = TX_INTERVAL*1000;
 
 // Pin mapping
